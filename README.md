@@ -10,7 +10,7 @@ Regenerate the file with `npm run bundle`.
 
 ## Windows game
 
-Run **Lumenwild-Setup-0.9.0-x64.exe** on 64-bit Windows 10 or newer. The installer adds Lumenwild to the Start menu and desktop. It includes its runtime: no Node.js installation, command-file launcher, or external browser is required.
+Download the installer from [the latest GitHub release](https://github.com/baba4488aj/Note-app/releases/latest) and run it on 64-bit Windows 10 or newer. The installer adds Lumenwild to the Start menu and desktop. It includes its runtime: no Node.js installation, command-file launcher, or external browser is required.
 
 The native game keeps the original desktop save location, **`%APPDATA%\Lumenwild\save.json`**, and its previous-save backup. If you used the older command-file launcher, close it before starting the installed game. Its existing save is loaded automatically. Browser progress can be moved with **Saves → Export save backup**, then **Saves → Import save backup** in the installed game. To export an older browser save, first replace its HTML with the updated file at the same filename/location (or use the same localhost URL).
 
@@ -22,13 +22,13 @@ Before exit or installation, the game stops auto-training, finishes the current 
 
 The release feed is **`baba4488aj/Note-app` on GitHub Releases**, configured in `desktop/release-config.json`. Public stable releases include the installer, its `.blockmap`, and `latest.yml`. Electron Updater handles version selection, download checksums, and NSIS installation. Prereleases and downgrades are disabled.
 
-**The first release must be published before the live update feed can serve downloads.** The GitHub release API was inaccessible in this cloud session, so no release was published from here. The installer can be used directly while release publishing is being activated. Code signing is not configured; the current Windows installer is unsigned.
+The public update feed is live on [GitHub Releases](https://github.com/baba4488aj/Note-app/releases/latest). The Windows build and all 125 tests passed on GitHub Actions, and the published installer and update metadata were downloaded and checksum-verified. Code signing is not configured; the current Windows installer is unsigned.
 
 ### Publish releases
 
 The workflow at `.github/workflows/desktop-release.yml` builds on Windows and stages a draft release. It uploads the complete installer/update set before publishing that draft as the latest release. Existing published version files are never replaced.
 
-For the first release, commit and push this project, including the workflow and lockfile, to the configured GitHub repository. Then run **Actions → Windows game release → Run workflow**, or push a version tag matching `package.json` (currently `v0.9.0`). The repository must allow GitHub Actions to write release contents and must serve public release downloads.
+The game source, workflow, and first release are published. For each future release, increase the version and push its matching tag. You can also start **Actions → Windows game release → Run workflow** after committing a new version. The workflow will not replace an existing published version; it stages all update assets before publishing.
 
 For later updates, start from a clean checkout:
 
