@@ -135,6 +135,42 @@ Next-level XP is `round(60 × accountLevel^1.6)`. Excess carries over; the accou
 
 Every ordinary, custom, and Legend species uses these four stages. Dossiers preview all stages. Role skills unlock at 3, 5, 8, and 12; element skills unlock at 1, 3, 6, and 10. Unlocked skills remain available in the library for future builds.
 
+## Ordinary passives and talent choices
+
+Every ordinary pet and custom pet has an innate animal passive, shown in its dossier, sanctuary card, Pet studio preview, and battle badges. Passives use no skill slots. Custom pets with mythological animal models receive an ordinary role-based passive; actual Legends retain their exclusive passives.
+
+| Animal | Passive | Effect |
+| --- | --- | --- |
+| Deer | Spring offering | Healing one ally shares 25% of the HP actually restored with the most wounded other living ally. Shared healing cannot trigger another passive. |
+| Fox | Prismatic instinct | After triggering an elemental reaction, gain Courage (+35% damage) for 2 rounds. Once per skill. |
+| Bear | Cooling obsidian | The first time damage leaves you alive below 40% HP, gain a shield equal to 20% of maximum HP. Once per encounter. |
+| Owl | Keen sight | Deal 15% more direct damage to exposed enemies, in addition to exposure’s normal bonus. |
+| Tortoise | Verdant recycle | At the start of your turn, convert up to 10% of your maximum HP in leftover shield into half as much healing for the most wounded living ally. Only consume shield that can restore HP. |
+| Otter | Sharing current | After using a single-ally healing skill, grant 2 rounds of regeneration to the most wounded other living ally. |
+| Shark | Deepwater hunter | Deal 20% more direct damage to enemies below 50% HP. |
+| Lynx | Opening pounce | Deal 15% more direct damage to enemies above 75% HP. |
+| Stag | Grove guardian | When you taunt, give every other living ally a shield equal to 4% of your maximum HP. |
+| Penguin | Icebound shelter | At round end, if you still have a shield, restore 4% of your maximum HP. Cannot revive. |
+| Manta ray | Lantern wake | After casting a team buff without damage or healing, shield the living ally with the lowest HP percentage for 5% of their maximum HP. |
+| Moth | Cleansing pollen | Your active healing skills also remove burn from their living targets. |
+
+Open **Stats & abilities → A path of their own** to choose one talent for each pet at account levels **25, 50, and 75**. Level 25 is a role choice, 50 an element choice, and 75 a role mastery. Choices are independent per pet, never consume a skill slot, and can be swapped or reset for free. Changes save immediately and apply in the next encounter. New recruits at a high account level can immediately choose every unlocked tier. Locked, wrong-role, and wrong-element selections are rejected or repaired during save migration.
+
+| Role | Level 25 choices | Level 75 choices |
+| --- | --- | --- |
+| Tank | Deep roots: +15% maximum HP. / Guardian arts: +25% healing and shield power. | Last stand: Once per encounter, survive a lethal direct hit at 1 HP and gain a 20% max-HP shield. / Guardian aura: At the start of your turn, shield the most wounded other living ally for 6% of your maximum HP. |
+| Fighter | Ferocity: +12% ability damage. / Siphoning strikes: Restore HP equal to 12% of the HP damage dealt by your active attacks. Does not revive or trigger from passives, reactions, or counters. | Executioner: +25% direct damage against foes below 35% HP. / Battle momentum: Once per round, a credited kill reduces all your current skill cooldowns by 1. |
+| Support | Restoration: +15% healing and shield power. / Overflowing grace: Active healing converts 50% of unused healing into a shield, capped at 15% of the target’s max HP. Shields do not stack. | Evergreen: Regeneration you apply lasts 1 extra round. / Wardweaver: Your active healing skills also shield each living target for 6% of their maximum HP. Shields do not stack. |
+
+| Element | Level 50 choices |
+| --- | --- |
+| Ember | Endless kindling: Burns you apply deal 40% more damage. / Ashen heart: +8% maximum HP and immunity to burn. |
+| Grove | Renewal: Regeneration you receive restores 50% more HP. / Heartwood: +10% maximum HP. |
+| Tide | Healing tide: +20% healing and shield power. / Surging tide: +20% elemental reaction damage and healing. |
+| Astral | Charged arts: +15% direct Astral damage. / Conductor: +25% elemental reaction damage and healing. |
+
+Overhealing and mastery shields replace smaller shields rather than stacking. Siphoning strikes use actual HP damage from active attacks, excluding shield absorption, overkill, passive strikes, counters, and reactions. Last stand protects against one lethal direct hit; burn and reflected damage can still defeat the pet. Battle momentum uses normal kill credit, including reaction and burn kills, once per round while the pet is alive. Normal enemies and minions use their animal passives; unchosen talent tiers grant no bonus.
+
 ## Legend pets and innate passives
 
 | Legend | Role / element | Innate passive |
@@ -158,6 +194,8 @@ Repeatable encounters scale to account level. Gentle uses two weaker enemies and
 
 **Auto-training** uses normal combat, equipped skills, passives, cooldowns, item XP, random drops, and reward claims. It repeats encounters and recovers after defeats while the page stays open. Stop finishes the current turn, including the enemy response, then returns manual control. Only one worker can run; reload always leaves it stopped. There is no offline farming. Encounters exceeding 80 rounds pause for manual adjustment. Tower battles remain manual.
 
+**Auto-training goals** are available on the training card and during training encounters. Set a completed-battle limit (0 = unlimited), an account-level target (0 = disabled), and/or an item target (none, any new drop, or a specific relic). The first reached goal finishes the current encounter, claims victory rewards once, records loot from wins/losses/draws, and stops before restarting. A level target already reached stops before any action. Previously owned items do not satisfy drop goals. Wins, losses, draws, XP, recruits, and item drops appear in the session counters with a clear stop reason. Settings persist, while session counters and the running worker reset on reload. Goals are fixed when a session starts; manual Stop retains its current-turn behavior.
+
 ### Astral spire and real boss trials
 
 Twenty sequential floors: every opponent on floor N is exactly **level 5 × N**, from level 5 on floor 1 to level 100 on floor 20. Bosses remain on floors 5, 10, 15, and 20, at levels 25, 50, 75, and 100 respectively. Summoned minions use the same level as their floor. Ordinary floors have a tank, fighter, and support. First clears unlock the next floor; training and defeats never advance the tower. Tower XP uses a 1.15 multiplier.
@@ -179,7 +217,7 @@ Claim first victory rewards for guaranteed recruitment of that Legend with its n
 
 Each pet wears one relic copy. Copies cannot be shared at the same time. The satchel's copy selector shows the level, XP, and wearer of each individual copy. Unequipping and transferring an item preserves its growth.
 
-Equipped items earn the same battle XP award as their wearer, including shared XP, even at account level 100. Fallen deployed pets' items also earn shared XP; benched and unworn copies earn none. Item level caps at **20**, with next-level XP `40 + 20 × (level − 1)`.
+The finishing pet’s equipped item earns full base kill XP; other deployed items earn half, rounded up, including items worn by fallen pets. Items keep earning XP at account level 100. Benched and unworn copies earn none. Item level caps at **20**, with next-level XP `40 + 20 × (level − 1)`.
 
 HP, damage, recovery, defense, thorns, and regeneration bonuses grow by 10% of their base value per item level. Ability-granting relics additionally gain 2 HP and 4% skill power per level above 1. Growth saves immediately; the current battle keeps its item snapshot until the next encounter.
 
@@ -208,7 +246,7 @@ Spells combine projectiles, lightning arcs, fire cones, glyphs, particles, impac
 
 The **Saves** screen exports versioned JSON backups, imports older saves, and can undo the most recent import. Invalid or newer-version files are rejected before replacing progress. The native renderer is sandboxed, with Node disabled and a narrow preload API for updates; save writes remain in the main process’s local service. Desktop writes are serialized and use temporary files with automatic previous-save backups; a corrupt current file can recover from the valid backup.
 
-Local saves preserve pets, species, base stats, account level and XP, collection sorting/filtering, selected skills, team, individual relic copies and growth, equipment assignments, training focus, tower/trial progress, and animation speed. Older counted inventories become separate level-1 copies with equipment assignments retained. Invalid selections and duplicate item assignments are repaired. The storage key stays `lumenwild-v2`; no reset is required. In-progress encounters and auto-training state are not restored after reload.
+Local saves preserve pets, species, base stats, account level and XP, collection sorting/filtering, selected skills, per-pet talent choices, training goals, team, individual relic copies and growth, equipment assignments, training focus, tower/trial progress, and animation speed. Older counted inventories become separate level-1 copies with equipment assignments retained. Invalid selections and duplicate item assignments are repaired. The storage key stays `lumenwild-v2`; no reset is required. In-progress encounters and auto-training state are not restored after reload.
 
 | Module | Responsibility |
 | --- | --- |
@@ -218,6 +256,9 @@ Local saves preserve pets, species, base stats, account level and XP, collection
 | `src/skills.js` | Unlocked libraries, four-slot validation, enemy builds |
 | `src/relics.js` | Individual copies, level scaling, XP, random drop rolls |
 | `src/progression.js` | Account growth, legacy level migration, pet snapshots, defeat XP |
+| `src/passives.js` | Animal passives and exclusive Legend lookup |
+| `src/talents.js` | Milestone choices, validation, stat modifiers |
+| `src/training-goals.js` | Saved stop settings and goal descriptions |
 | `src/collection.js` | Saved sorting and combined element/role filters |
 | `src/reactions.js` | Six elemental combinations and aura rules |
 | `src/bosses.js` | Boss arts, lair rules, themed minion templates |

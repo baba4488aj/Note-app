@@ -5,7 +5,7 @@ const path=require('node:path');
 const os=require('node:os');
 const crypto=require('node:crypto');
 const {spawn}=require('node:child_process');
-const DESKTOP_VERSION='0.10.0';
+const DESKTOP_VERSION='0.11.0';
 const DEFAULT_PORT=57841;
 const MAX_SAVE_BYTES=4*1024*1024;
 function isNewer(a,b=DESKTOP_VERSION){const aa=String(a||'0').split('.').map(Number),bb=b.split('.').map(Number);for(let i=0;i<3;i++)if((aa[i]||0)!==(bb[i]||0))return (aa[i]||0)>(bb[i]||0);return false;}

@@ -5,10 +5,12 @@ import {itemStats} from './relics.js';
 import {equippedMoves,enemyLoadout} from './skills.js';
 import {bossProfile,summonTemplate} from './bosses.js';
 import {touchElement} from './reactions.js';
+import {passiveOf} from './passives.js';
+import {hasTalent,talentBonuses,normalizedTalents} from './talents.js';
 export {abilities,statuses,items,roles,elements,elementMultiplier,starters,wilds,resolveRole,roleLoadout} from './catalog.js';
 export function preparePet(p,relic=null,{enemy=false}={}){
  p=roleLoadout(p);const gear=itemStats(relic),stats=petStats(p,relic),growth=progressionOf(p),profile=p.boss&&bossProfile(p);
- return {...structuredClone(p),...growth,baseMaxHp:stats.maxHp,maxHp:stats.maxHp,hp:stats.maxHp,attackFactor:stats.attack*(p.encounterPower||1),healingFactor:stats.recovery*(p.encounterPower||1),defense:Math.min(.6,stats.defense+(p.encounterDefense||0)),item:gear.type,itemLevel:gear.level,itemBonuses:gear,relicId:typeof relic==='object'?relic?.id:null,moves:profile?[...profile.kit]:enemy&&!p.minion?enemyLoadout(p):equippedMoves(p,relic),shield:0,statuses:{},statusSources:{},cooldowns:{},acted:false,turnStarted:0,passiveStacks:0,...(profile?{bossPhase:1,summonWaves:0,nextSpecialRound:2}: {})};
+ return {...structuredClone(p),...growth,talents:normalizedTalents(p,growth.level),passiveState:{},baseMaxHp:stats.maxHp,maxHp:stats.maxHp,hp:stats.maxHp,attackFactor:stats.attack*(p.encounterPower||1),healingFactor:stats.recovery*(p.encounterPower||1),defense:Math.min(.6,stats.defense+(p.encounterDefense||0)),item:gear.type,itemLevel:gear.level,itemBonuses:gear,relicId:typeof relic==='object'?relic?.id:null,moves:profile?[...profile.kit]:enemy&&!p.minion?enemyLoadout(p):equippedMoves(p,relic),shield:0,statuses:{},statusSources:{},cooldowns:{},acted:false,turnStarted:0,passiveStacks:0,...(profile?{bossPhase:1,summonWaves:0,nextSpecialRound:2}: {})};
 }
 export function createBattle(team,enemies,equipment={}){
  if(!Array.isArray(team)||!Array.isArray(enemies)||!team.length||!enemies.length||team.length>3||enemies.length>3||new Set(team.map(p=>p.id)).size!==team.length||new Set(enemies.map(p=>p.id)).size!==enemies.length)throw new Error('Choose one to three different pets per team.');
@@ -21,18 +23,29 @@ const living=team=>team.filter(p=>p.hp>0);
 function everyone(b){return [...b.players,...b.enemies,...(b.fallenEnemies||[])];}
 function outcome(b){const p=living(b.players).length,boss=b.enemies.find(p=>p.boss),e=b.bossTrial&&boss?.hp<=0?0:living(b.enemies).length;if(!p||!e){b.outcome=!p&&!e?'draw':e?'lost':'won';b.phase='finished';if(!e&&b.bossTrial)for(const minion of b.enemies.filter(p=>p.minion))minion.hp=0;}}
 export function attackMultiplier(p){return (p.itemBonuses?.damage||1)*(1+(p.passiveStacks||0)*.06)*(p.statuses.might?1.35:1)*(p.statuses.weaken ? .75 : 1);}
-function directPower(actor,target,power,element=actor.element){return Math.round(power*actor.attackFactor*(1-damageReduction(target))*elementMultiplier(element,target.element)*attackMultiplier(actor)*(target.statuses.exposed?1.25:1));}
+export function directPower(actor,target,power,element=actor.element){
+ let extra=1;if(element!==null){const passive=passiveOf(actor).id;if(passive==='keenSight'&&target.statuses.exposed)extra*=1.15;if(passive==='predator'&&target.hp/target.maxHp<.5)extra*=1.2;if(passive==='pounce'&&target.hp/target.maxHp>.75)extra*=1.15;if(hasTalent(actor,'executioner')&&target.hp/target.maxHp<.35)extra*=1.25;if(element==='Astral'&&hasTalent(actor,'charged'))extra*=1.15;}
+ return Math.round(power*actor.attackFactor*(1-damageReduction(target))*elementMultiplier(element,target.element)*attackMultiplier(actor)*(target.statuses.exposed?1.25:1)*extra);
+}
+function shieldPet(p,power,effects){if(p.hp<=0||power<=0)return false;const value=Math.round(power),before=p.shield;p.shield=Math.max(p.shield,value);effects.push({cid:p.cid,type:'shield',text:'◈ '+value+' shield'});return p.shield>before;}
+function passiveNote(p,effects){const passive=passiveOf(p);effects.push({cid:p.cid,type:'passive',text:passive.icon+' '+passive.name});}
 function damage(target,amount,effects,source=null,credit=source?.cid){
- const blocked=Math.min(target.shield,amount);target.shield-=blocked;const n=Math.min(target.hp,Math.max(0,amount-blocked));target.hp-=n;
+ const blocked=Math.min(target.shield,amount);target.shield-=blocked;let n=Math.min(target.hp,Math.max(0,amount-blocked)),lastStand=false;
+ if(source&&target.hp>0&&n>=target.hp&&hasTalent(target,'lastStand')&&!target.passiveState.lastStand){n=target.hp-1;target.passiveState.lastStand=true;lastStand=true;}
+ target.hp-=n;
  effects.push({cid:target.cid,type:'damage',value:n,killer:credit,defeated:n>0&&target.hp===0,text:`−${n}${blocked?' · '+blocked+' blocked':''}`});
+ if(lastStand){shieldPet(target,target.maxHp*.2,effects);effects.push({cid:target.cid,type:'talent',text:'✧ Last stand · survived at 1 HP'});}
+ if(n>0&&target.hp>0&&target.hp/target.maxHp<.4&&passiveOf(target).id==='obsidian'&&!target.passiveState.obsidian){target.passiveState.obsidian=true;shieldPet(target,target.maxHp*.2,effects);passiveNote(target,effects);}
  const thorns=target.itemBonuses?.thorns||0;
  if(source&&n>0&&thorns&&source.hp>0){const reflect=Math.min(source.hp,thorns);source.hp-=reflect;effects.push({cid:source.cid,type:'damage',value:reflect,killer:target.cid,defeated:reflect>0&&source.hp===0,text:'−'+reflect+' thorns'});}
  const counter=target.statuses.counter?18:target.id==='legend-cloudsage'?7:0;
  if(source&&amount>0&&source.hp>0&&target.hp>0&&counter){const index=effects.length;damage(source,directPower(target,source,counter,'Grove'),effects,null,target.cid);effects[index].counter=true;effects[index].retaliationFrom=target.cid;effects[index].text='↶ Counter '+effects[index].text;}
  return n;
 }
-function heal(p,amount,effects){if(p.hp<=0)return;const n=Math.min(p.maxHp-p.hp,amount);p.hp+=n;effects.push({cid:p.cid,type:'heal',value:n,text:'+'+n+' HP'});}
+function heal(p,amount,effects){if(p.hp<=0)return 0;const n=Math.min(p.maxHp-p.hp,amount);p.hp+=n;effects.push({cid:p.cid,type:'heal',value:n,text:'+'+n+' HP'});return n;}
 function applyStatus(p,id,duration,actor,effects){
+ if(p.hp>0&&id==='burn'&&hasTalent(p,'ashenHeart')){effects.push({cid:p.cid,type:'talent',text:'✧ Ashen heart · burn immune'});return;}
+ if(id==='regen'&&hasTalent(actor,'evergreen'))duration++;
  if(p.hp<=0)return;if(id==='vigor'&&!p.statuses.vigor){const max=Math.round(p.baseMaxHp*1.2),extra=max-p.maxHp;p.maxHp=max;p.hp=Math.min(max,p.hp+Math.max(0,extra));effects.push({cid:p.cid,type:'buff',text:'+'+extra+' max HP'});}
  p.statusSources[id]=actor.cid;p.statuses[id]=Math.max(p.statuses[id]||0,duration);effects.push({cid:p.cid,type:['burn','weaken','exposed','stun'].includes(id)?'debuff':'buff',text:statuses[id].name});
 }
@@ -45,13 +58,26 @@ function resolveReactions(b,actor,pending){
   const affected=reaction.heal?living(allies).sort((a,z)=>a.hp/a.maxHp-z.hp/z.maxHp).slice(0,1):reaction.area?living(foes):targets.filter(p=>p.hp>0);
   const event={actor:actor.cid,kind:reaction.id,label:reaction.elements.join(' + ')+' · '+reaction.name,reaction:reaction.id,targets:affected.map(p=>p.cid),effects:[]};
   for(const target of affected){
-   if(reaction.heal){heal(target,Math.round(reaction.power*actor.healingFactor),event.effects);applyStatus(target,'regen',2,actor,event.effects);}
-   else {damage(target,directPower(actor,target,reaction.power,null),event.effects,null,actor.cid);if(reaction.status)applyStatus(target,reaction.status,reaction.duration,actor,event.effects);}
+   if(reaction.heal){heal(target,Math.round(reaction.power*actor.healingFactor*talentBonuses(actor).reaction),event.effects);applyStatus(target,'regen',2,actor,event.effects);}
+   else {damage(target,directPower(actor,target,reaction.power*talentBonuses(actor).reaction,null),event.effects,null,actor.cid);if(reaction.status)applyStatus(target,reaction.status,reaction.duration,actor,event.effects);}
    event.effects.push({cid:target.cid,type:'reaction',text:reaction.icon+' '+reaction.name});
   }
-  b.log.push(actor.name+' triggered '+event.label+'.');logEffects(b,event);recordDefeats(b,event);events.push(event);
+  events.push(event);
  }
+ if(events.length&&actor.hp>0&&passiveOf(actor).id==='prismatic'){applyStatus(actor,'might',2,actor,events.at(-1).effects);passiveNote(actor,events.at(-1).effects);}
+ for(const event of events){b.log.push(actor.name+' triggered '+event.label+'.');logEffects(b,event);recordDefeats(b,event);}
  return events;
+}
+function afterSkill(b,actor,a,targets,event){
+ if(actor.hp<=0)return;const allies=living(actor.side==='player'?b.players:b.enemies),passive=passiveOf(actor).id;
+ if(isRecovery(a)&&a.target==='ally'){
+  const others=allies.filter(p=>!targets.includes(p)).sort((p,q)=>p.hp/p.maxHp-q.hp/q.maxHp),other=others[0];
+  if(passive==='springShare'&&other&&other.hp<other.maxHp){const restored=event.effects.filter(e=>e.type==='heal'&&targets.some(p=>p.cid===e.cid)).reduce((sum,e)=>sum+e.value,0);if(restored>0){heal(other,Math.round(restored*.25),event.effects);passiveNote(actor,event.effects);}}
+  if(passive==='sharingCurrent'&&other){applyStatus(other,'regen',2,actor,event.effects);passiveNote(actor,event.effects);}
+ }
+ if(passive==='groveGuardian'&&isTaunt(a)){for(const p of allies.filter(p=>p!==actor))shieldPet(p,actor.maxHp*.04,event.effects);if(allies.length>1)passiveNote(actor,event.effects);}
+ if(passive==='lanternWake'&&a.target==='allAllies'&&!a.power){const target=[...allies].sort((p,q)=>p.hp/p.maxHp-q.hp/q.maxHp)[0];if(target&&shieldPet(target,target.maxHp*.05,event.effects))passiveNote(actor,event.effects);}
+ if(hasTalent(actor,'siphon')&&a.power&&!isRecovery(a)&&!isBarrier(a)){const dealt=event.effects.filter(e=>e.type==='damage'&&e.killer===actor.cid&&targets.some(p=>p.cid===e.cid)).reduce((sum,e)=>sum+e.value,0);if(dealt>0&&actor.hp<actor.maxHp){heal(actor,Math.round(dealt*.12),event.effects);event.effects.push({cid:actor.cid,type:'talent',text:'✧ Siphoning strikes'});}}
 }
 function summonWave(b,boss,events){
  if(boss.summonWaves>=2)return;const slots=3-living(b.enemies).length;if(slots<=0)return;
@@ -69,6 +95,8 @@ function startTurn(b,actor){
  const passive=legendPassives[actor.id];
  if(actor.id==='legend-neruvia'){const target=living(allies).sort((a,z)=>a.hp/a.maxHp-z.hp/z.maxHp)[0];if(target&&target.hp<target.maxHp){const event={actor:actor.cid,kind:'heal',label:passive.name,targets:[target.cid],effects:[]};heal(target,Math.round(12*actor.healingFactor),event.effects);events.push(event);}}
  if(actor.id==='legend-stormroc'){const event={actor:actor.cid,kind:'thunderstorm',label:passive.name,targets:[],effects:[]};for(const target of living(foes)){if(actor.hp<=0)break;event.targets.push(target.cid);damage(target,directPower(actor,target,7,'Astral'),event.effects,actor);}events.push(event);}
+ if(passiveOf(actor).id==='recycle'&&actor.shield>0){const target=living(allies).filter(p=>p.hp<p.maxHp).sort((p,q)=>p.hp/p.maxHp-q.hp/q.maxHp)[0];if(target){const consume=Math.min(actor.shield,Math.floor(actor.maxHp*.1),2*(target.maxHp-target.hp));if(consume>=2){actor.shield-=consume;const event={actor:actor.cid,kind:'heal',label:passiveOf(actor).name,targets:[target.cid],effects:[{cid:actor.cid,type:'shield',text:'−'+consume+' shield · recycled'}]};heal(target,Math.floor(consume/2),event.effects);passiveNote(actor,event.effects);events.push(event);}}}
+ if(hasTalent(actor,'guardianAura')){const target=living(allies).filter(p=>p!==actor).sort((p,q)=>p.hp/p.maxHp-q.hp/q.maxHp)[0];if(target&&target.shield<Math.round(actor.maxHp*.06)){const event={actor:actor.cid,kind:'bastion',label:'Guardian aura',targets:[target.cid],effects:[]};shieldPet(target,actor.maxHp*.06,event.effects);events.push(event);}}
  for(const event of events){b.log.push(`${actor.name} · ${event.label}.`);logEffects(b,event);recordDefeats(b,event);}outcome(b);return events;
 }
 export function performAction(b,side,actorId,moveId,targetId){
@@ -81,12 +109,19 @@ export function performAction(b,side,actorId,moveId,targetId){
   if(isTaunt(a))for(const ally of allies){delete ally.statuses.taunt;delete ally.statusSources.taunt;}
   for(const t of targets){
    if(t.hp<=0)continue;
-   if(isRecovery(a)){heal(t,Math.round(a.power*actor.healingFactor*powerFactor),event.effects);if(a.kind==='cleanse'){for(const id of ['burn','weaken','exposed','stun']){delete t.statuses[id];delete t.statusSources[id];}delete t.elementalAura;event.effects.push({cid:t.cid,type:'buff',text:'Cleansed'});}}
-   else if(isBarrier(a)){const power=Math.round(a.power*actor.healingFactor*powerFactor);t.shield=Math.max(t.shield,power);event.effects.push({cid:t.cid,type:'shield',text:'◈ '+power+' shield'});}
+   if(isRecovery(a)){
+    const power=Math.round(a.power*actor.healingFactor*powerFactor),restored=heal(t,power,event.effects),extra=power-restored;
+    if(hasTalent(actor,'overflow')&&extra>0&&shieldPet(t,Math.min(t.maxHp*.15,extra*.5),event.effects))event.effects.push({cid:actor.cid,type:'talent',text:'✧ Overflowing grace'});
+    if(hasTalent(actor,'wardweaver')&&shieldPet(t,t.maxHp*.06,event.effects))event.effects.push({cid:actor.cid,type:'talent',text:'✧ Wardweaver'});
+    if(passiveOf(actor).id==='pollen'&&t.statuses.burn){delete t.statuses.burn;delete t.statusSources.burn;passiveNote(actor,event.effects);}
+    if(a.kind==='cleanse'){for(const id of ['burn','weaken','exposed','stun']){delete t.statuses[id];delete t.statusSources[id];}delete t.elementalAura;event.effects.push({cid:t.cid,type:'buff',text:'Cleansed'});}
+   }
+   else if(isBarrier(a))shieldPet(t,a.power*actor.healingFactor*powerFactor,event.effects);
    else if(a.power){const element=abilityElement(actor,a),matchup=elementMultiplier(element,t.element),index=event.effects.length;damage(t,directPower(actor,t,a.power*powerFactor,element),event.effects,actor);event.effects[index].multiplier=matchup;if(matchup!==1)event.effects[index].text+=matchup>1?' · strong 1.5×':' · resisted 0.75×';const reaction=touchElement(t,element);if(reaction)pending.push({reaction,target:t});else if(t.hp>0)event.effects.push({cid:t.cid,type:'aura',text:elements[element].icon+' '+element+' aura'});}
    if(a.status)applyStatus(t,a.status,a.duration,actor,event.effects);for(const effect of a.extraStatuses||[])applyStatus(t,effect.id,effect.duration,actor,event.effects);
   }
   for(const effect of a.selfStatuses||[])applyStatus(actor,effect.id,effect.duration,actor,event.effects);
+  afterSkill(b,actor,a,targets,event);
   if(actor.boss&&moveId===bossProfile(actor)?.special)actor.nextSpecialRound=b.round+3;
   b.log.push(`${actor.name} → ${a.name} → ${targets.map(t=>t.name).join(', ')}.`);logEffects(b,event);recordDefeats(b,event);event.afterEvents=resolveReactions(b,actor,pending);outcome(b);
  }
@@ -112,12 +147,13 @@ export function enemyPlan(b,actor){
 export function finishRound(b){
  if(b.outcome||b.phase!=='enemy'||living(b.enemies).some(p=>!p.acted))return null;const event={kind:'round',actor:null,targets:[],effects:[],beforeEvents:[]};
  for(const p of [...b.players,...b.enemies]){if(p.hp<=0)continue;
-  if(p.statuses.burn){const caster=everyone(b).find(q=>q.cid===p.statusSources?.burn),burn=Math.round(6*levelGrowth(caster?.level).attack);damage(p,burn,event.effects,null,p.statusSources?.burn);const foes=p.side==='player'?b.enemies:b.players;for(const dragon of living(foes).filter(p=>p.id==='legend-pyrragon'&&p.passiveStacks<10)){dragon.passiveStacks++;event.effects.push({cid:dragon.cid,type:'passive',text:'♨ Ember '+dragon.passiveStacks+' · +'+dragon.passiveStacks*6+'% attack'});}}
-  if(p.hp>0&&(p.statuses.regen||p.itemBonuses.regen))heal(p,(p.statuses.regen?Math.round(8*p.healingFactor):0)+p.itemBonuses.regen,event.effects);
+  if(p.statuses.burn){const caster=everyone(b).find(q=>q.cid===p.statusSources?.burn),burn=Math.round(6*levelGrowth(caster?.level).attack*(caster&&hasTalent(caster,'kindling')?1.4:1));damage(p,burn,event.effects,null,p.statusSources?.burn);const foes=p.side==='player'?b.enemies:b.players;for(const dragon of living(foes).filter(p=>p.id==='legend-pyrragon'&&p.passiveStacks<10)){dragon.passiveStacks++;event.effects.push({cid:dragon.cid,type:'passive',text:'♨ Ember '+dragon.passiveStacks+' · +'+dragon.passiveStacks*6+'% attack'});}}
+  if(p.hp>0&&(p.statuses.regen||p.itemBonuses.regen))heal(p,(p.statuses.regen?Math.round(8*p.healingFactor*(hasTalent(p,'renewal')?1.5:1)):0)+p.itemBonuses.regen,event.effects);
+  if(p.hp>0&&p.hp<p.maxHp&&p.shield>0&&passiveOf(p).id==='icebound'){heal(p,Math.round(p.maxHp*.04),event.effects);passiveNote(p,event.effects);}
   for(const id in p.statuses){if(id==='stun')continue;p.statuses[id]--;if(p.statuses[id]<=0){delete p.statuses[id];delete p.statusSources[id];if(id==='vigor'){p.maxHp=p.baseMaxHp;p.hp=Math.min(p.hp,p.maxHp);}}}
   for(const id in p.cooldowns)p.cooldowns[id]=Math.max(0,p.cooldowns[id]-1);p.acted=false;
   if(p.elementalAura&&--p.elementalAura.remaining<=0)delete p.elementalAura;
  }
  logEffects(b,event);recordDefeats(b,event);outcome(b);if(!b.outcome){b.round++;b.phase='player';b.log.push(`Round ${b.round}: your team acts.`);if(!hasReady(b.players)){const skips=consumeStuns(b,'player');event.effects.push(...skips.effects);event.beforeEvents.push(...skips.beforeEvents);}}return event;
 }
-function recordDefeats(b,event){for(const effect of event.effects){if(!effect.defeated||b.defeats.some(d=>d.cid===effect.cid))continue;const p=everyone(b).find(p=>p.cid===effect.cid);b.defeats.push({cid:p.cid,side:p.side,killer:effect.killer});b.log.push(`${p.name} was defeated.`);}}
+function recordDefeats(b,event){for(const effect of [...event.effects]){if(!effect.defeated||b.defeats.some(d=>d.cid===effect.cid))continue;const p=everyone(b).find(p=>p.cid===effect.cid);b.defeats.push({cid:p.cid,side:p.side,killer:effect.killer});b.log.push(`${p.name} was defeated.`);const killer=everyone(b).find(p=>p.cid===effect.killer);if(killer?.hp>0&&hasTalent(killer,'momentum')&&killer.passiveState.momentumRound!==b.round){killer.passiveState.momentumRound=b.round;for(const id in killer.cooldowns)killer.cooldowns[id]=Math.max(0,killer.cooldowns[id]-1);event.effects.push({cid:killer.cid,type:'talent',text:'✧ Battle momentum · cooldowns −1'});b.log.push(killer.name+' · Battle momentum reduced current cooldowns by 1.');}}}

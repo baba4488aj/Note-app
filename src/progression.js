@@ -1,3 +1,4 @@
+import {talentBonuses} from './talents.js';
 import {MAX_PET_LEVEL,levelGrowth} from './rules.js';
 import {itemStats,grantItemXp} from './relics.js';
 import {growthStage} from './stages.js';
@@ -14,7 +15,7 @@ export function migrateAccount(raw,pets){
  const best=pets.map(p=>{const level=Number.isInteger(p.level)?Math.max(1,Math.min(MAX_LEVEL,p.level)):1,need=60+30*(level-1),xp=Number.isInteger(p.xp)&&p.xp>0?Math.min(p.xp,need-1):0;return {level,xp,fraction:xp/need};}).sort((a,b)=>b.level-a.level||b.fraction-a.fraction)[0]||{level:1,fraction:0};
  return {level:best.level,xp:best.level===MAX_LEVEL?0:Math.floor(best.fraction*xpToNext(best.level))};
 }
-export function petStats(p,itemId=null){const {level}=progressionOf(p),growth=levelGrowth(level),item=itemStats(itemId);return {level,maxHp:Math.round(p.hp*growth.health)+item.hp,attack:growth.attack,recovery:growth.recovery*item.recovery,defense:Math.min(.6,growth.defense+item.defense)};}
+export function petStats(p,itemId=null){const {level}=progressionOf(p),growth=levelGrowth(level),item=itemStats(itemId),talent=talentBonuses(p);return {level,maxHp:Math.round((Math.round(p.hp*growth.health)+item.hp)*talent.hp),attack:growth.attack*talent.attack,recovery:growth.recovery*item.recovery*talent.recovery,defense:Math.min(.6,growth.defense+item.defense)};}
 export function learnedMoves(p){const q=roleLoadout(p),{level}=progressionOf(q);return [...new Set([...q.moves.filter(id=>(abilities[id]?.minLevel||1)<=level),...learnsets[q.role].filter(([,lv])=>lv<=level).map(([id])=>id),...(elementalLearnsets[q.element]||[]).filter(([,lv])=>lv<=level).map(([id])=>id)])];}
 export function grantXp(p,amount){if(!Number.isFinite(amount)||amount<=0)return {amount:0,before:progressionOf(p).level,after:progressionOf(p).level,unlocked:[]};const before=progressionOf(p);p.level=before.level;p.xp=before.xp;if(p.level===MAX_LEVEL)return {amount:0,before:MAX_LEVEL,after:MAX_LEVEL,unlocked:[]};p.xp+=Math.floor(amount);while(p.level<MAX_LEVEL&&p.xp>=xpToNext(p.level)){p.xp-=xpToNext(p.level);p.level++;}if(p.level===MAX_LEVEL)p.xp=0;const unlocked=[...(p.moves?learnsets[roleLoadout(p).role]:[]),...(elementalLearnsets[p.element]||[])].filter(([,lv])=>lv>before.level&&lv<=p.level).map(([id])=>id);return {amount:Math.floor(amount),before:before.level,after:p.level,unlocked};}
 export function grantAccountXp(state,amount){state.account=accountProgress(state);const reward=grantXp(state.account,amount);reward.unlocked=[...new Set([...Object.values(learnsets),...Object.values(elementalLearnsets)].flat().filter(([,level])=>level>reward.before&&level<=reward.after).map(([id])=>id))];return reward;}
