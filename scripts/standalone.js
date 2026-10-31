@@ -1,0 +1,11 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+const root=new URL('../',import.meta.url);
+const text=path=>readFile(new URL(path,root),'utf8');
+const strip=s=>s.replace(/^export \{.*\} from.*;\r?\n/gm,'').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
+let html=await text('index.html');
+const css=await text('src/style.css');
+html=html.replace('<link rel="stylesheet" href="/src/style.css">',()=>'<style>\n'+css+'\n</style>');
+const js=(await Promise.all(['src/rules.js','src/stages.js','src/catalog.js','src/relics.js','src/progression.js','src/skills.js','src/bosses.js','src/modes.js','src/combat.js','src/autotraining.js','src/storage.js','src/saves.js','src/art.js','src/effects.js','src/app.js'].map(text))).map(strip).join('\n');
+html=html.replace('<script type="module" src="/src/app.js"></script>',()=>'<script type="module">\n'+js.replace(/<\/script/gi,'<\\/script')+'\n</script>');
+const dest=process.argv[2]||fileURLToPath(new URL('Lumenwild.html',root));await writeFile(dest,html);console.log('Created standalone game: '+dest);

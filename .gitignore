@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+
+desktop-build/
+/Lumenwild.html
+/Lumenwild-Desktop-Windows.zip
+
+release/
+desktop/game/
+*.log
+
+.wine-build/

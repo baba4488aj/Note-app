@@ -1,0 +1,10 @@
+import {mkdir,readFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+import {GAME_VERSION} from '../src/rules.js';
+const root=fileURLToPath(new URL('../',import.meta.url)),pkg=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
+if(pkg.version!==GAME_VERSION)throw new Error('Run npm run sync-version before packaging.');
+const output=path.join(root,'desktop','game');await mkdir(output,{recursive:true});
+execFileSync(process.execPath,[path.join(root,'scripts','standalone.js'),path.join(output,'Lumenwild.html')],{stdio:'inherit'});
+console.log('Prepared Lumenwild '+pkg.version+' for Electron.');

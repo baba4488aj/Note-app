@@ -1,0 +1,35 @@
+{
+  "name": "lumenwild",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test": "node --test",
+    "check": "node scripts/check.js",
+    "bundle": "node scripts/standalone.js",
+    "desktop:bundle": "node scripts/desktop.js",
+    "sync-version": "node scripts/sync-version.js",
+    "version": "node scripts/sync-version.js",
+    "desktop:prepare": "node scripts/prepare-electron.js",
+    "desktop:dev": "npm run desktop:prepare && electron .",
+    "desktop:dist": "npm run desktop:prepare && electron-builder --config electron-builder.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "electron": "45.2.1",
+    "electron-builder": "26.18.0"
+  },
+  "main": "desktop/electron-main.cjs",
+  "productName": "Lumenwild",
+  "description": "An original pet collection and team battle game.",
+  "author": {
+    "name": "Lumenwild contributors"
+  }
+}

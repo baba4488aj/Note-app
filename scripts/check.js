@@ -1,0 +1,3 @@
+import {fileURLToPath} from 'node:url';
+import {readdir} from 'node:fs/promises';import {spawnSync} from 'node:child_process';
+for(const dir of ['src','scripts','desktop'])for(const name of await readdir(new URL('../'+dir+'/',import.meta.url))){if(!/\.(?:js|cjs)$/.test(name))continue;const result=spawnSync(process.execPath,['--check',fileURLToPath(new URL('../'+dir+'/'+name,import.meta.url))],{stdio:'inherit'});if(result.status!==0)process.exit(result.status||1);}const result=spawnSync(process.execPath,['--check',fileURLToPath(new URL('../server.js',import.meta.url))],{stdio:'inherit'});process.exit(result.status||0);
