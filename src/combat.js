@@ -4,6 +4,7 @@ import {abilities,statuses,items,roles,elements,elementMultiplier,starters,wilds
 import {itemStats} from './relics.js';
 import {equippedMoves,enemyLoadout} from './skills.js';
 import {bossProfile,summonTemplate} from './bosses.js';
+import {touchElement} from './reactions.js';
 export {abilities,statuses,items,roles,elements,elementMultiplier,starters,wilds,resolveRole,roleLoadout} from './catalog.js';
 export function preparePet(p,relic=null,{enemy=false}={}){
  p=roleLoadout(p);const gear=itemStats(relic),stats=petStats(p,relic),growth=progressionOf(p),profile=p.boss&&bossProfile(p);
@@ -11,7 +12,7 @@ export function preparePet(p,relic=null,{enemy=false}={}){
 }
 export function createBattle(team,enemies,equipment={}){
  if(!Array.isArray(team)||!Array.isArray(enemies)||!team.length||!enemies.length||team.length>3||enemies.length>3||new Set(team.map(p=>p.id)).size!==team.length||new Set(enemies.map(p=>p.id)).size!==enemies.length)throw new Error('Choose one to three different pets per team.');
- return {players:team.map((p,i)=>({...preparePet(p,equipment[p.id]),cid:'player-'+i,side:'player'})),enemies:enemies.map((p,i)=>({...preparePet(p,null,{enemy:true}),cid:'enemy-'+i,side:'enemy'})),fallenEnemies:[],nextEnemyId:enemies.length,bossTrial:enemies.some(p=>p.boss&&bossProfile(p)),defeats:[],xpProcessed:[],xpEarned:{},itemXpEarned:{},round:1,phase:'player',outcome:null,log:['Teams enter the clearing. Each living pet acts once per round.']};
+ return {players:team.map((p,i)=>({...preparePet(p,equipment[p.id]),cid:'player-'+i,side:'player'})),enemies:enemies.map((p,i)=>({...preparePet(p,null,{enemy:true}),cid:'enemy-'+i,side:'enemy'})),fallenEnemies:[],nextEnemyId:enemies.length,bossTrial:enemies.some(p=>p.boss&&bossProfile(p)),defeats:[],xpProcessed:[],accountXpEarned:0,itemXpEarned:{},round:1,phase:'player',outcome:null,log:['Teams enter the clearing. Each living pet acts once per round.']};
 }
 export function available(p,id){return p.hp>0&&!p.acted&&!p.statuses?.stun&&p.moves.includes(id)&&!!abilities[id]&&!(p.cooldowns[id]>0);}
 export function damageReduction(p){return Math.min(.6,(p.defense||0)+(p.statuses?.stoneskin ? .25 : 0));}
@@ -37,6 +38,21 @@ function applyStatus(p,id,duration,actor,effects){
 }
 export function legalTargets(b,side,moveId,actorId){const a=abilities[moveId];if(!a)return [];const allies=side==='player'?b.players:b.enemies,enemies=side==='player'?b.enemies:b.players;if(a.target==='self')return living(allies).filter(p=>p.cid===actorId);if(a.target==='ally'||a.target==='allAllies')return living(allies);const foes=living(enemies);if(a.target==='allEnemies')return foes;const taunter=foes.find(p=>p.statuses.taunt);return taunter?[taunter]:foes;}
 function logEffects(b,event){for(const e of event.effects)b.log.push(`${everyone(b).find(p=>p.cid===e.cid)?.name||'Spirit'}: ${e.text}.`);}
+function resolveReactions(b,actor,pending){
+ const events=[],groups=new Map(),foes=actor.side==='player'?b.enemies:b.players,allies=actor.side==='player'?b.players:b.enemies;
+ for(const {reaction,target}of pending){if(!groups.has(reaction.id))groups.set(reaction.id,{reaction,targets:[]});groups.get(reaction.id).targets.push(target);}
+ for(const {reaction,targets}of groups.values()){
+  const affected=reaction.heal?living(allies).sort((a,z)=>a.hp/a.maxHp-z.hp/z.maxHp).slice(0,1):reaction.area?living(foes):targets.filter(p=>p.hp>0);
+  const event={actor:actor.cid,kind:reaction.id,label:reaction.elements.join(' + ')+' · '+reaction.name,reaction:reaction.id,targets:affected.map(p=>p.cid),effects:[]};
+  for(const target of affected){
+   if(reaction.heal){heal(target,Math.round(reaction.power*actor.healingFactor),event.effects);applyStatus(target,'regen',2,actor,event.effects);}
+   else {damage(target,directPower(actor,target,reaction.power,null),event.effects,null,actor.cid);if(reaction.status)applyStatus(target,reaction.status,reaction.duration,actor,event.effects);}
+   event.effects.push({cid:target.cid,type:'reaction',text:reaction.icon+' '+reaction.name});
+  }
+  b.log.push(actor.name+' triggered '+event.label+'.');logEffects(b,event);recordDefeats(b,event);events.push(event);
+ }
+ return events;
+}
 function summonWave(b,boss,events){
  if(boss.summonWaves>=2)return;const slots=3-living(b.enemies).length;if(slots<=0)return;
  b.fallenEnemies.push(...b.enemies.filter(p=>p.minion&&p.hp<=0));b.enemies=b.enemies.filter(p=>!p.minion||p.hp>0);boss.summonWaves++;
@@ -58,20 +74,21 @@ function startTurn(b,actor){
 export function performAction(b,side,actorId,moveId,targetId){
  if(b.outcome||b.phase!==side)return null;const allies=side==='player'?b.players:b.enemies,actor=allies.find(p=>p.cid===actorId),a=abilities[moveId];if(!actor||!a||!available(actor,moveId))return null;
  let legal=legalTargets(b,side,moveId,actorId),targets=['self','allEnemies','allAllies'].includes(a.target)?legal:legal.filter(p=>p.cid===targetId);if(!targets.length)return null;
- const event={actor:actor.cid,move:moveId,kind:a.visual||a.kind,targets:[],effects:[],beforeEvents:[]};actor.acted=true;event.beforeEvents=startTurn(b,actor);
+ const event={actor:actor.cid,move:moveId,kind:a.visual||a.kind,targets:[],effects:[],beforeEvents:[],afterEvents:[]};actor.acted=true;event.beforeEvents=startTurn(b,actor);
  if(!b.outcome&&actor.hp>0){
   legal=legalTargets(b,side,moveId,actorId);targets=['self','allEnemies','allAllies'].includes(a.target)?legal:legal.filter(p=>p.cid===targetId);if(!targets.length)targets=legal.slice(0,1);event.targets=targets.map(p=>p.cid);actor.cooldowns[moveId]=a.cooldown;
-  const powerFactor=a.itemOnly?actor.itemBonuses.abilityFactor:1;
+  const powerFactor=a.itemOnly?actor.itemBonuses.abilityFactor:1,pending=[];
   if(isTaunt(a))for(const ally of allies){delete ally.statuses.taunt;delete ally.statusSources.taunt;}
   for(const t of targets){
-   if(isRecovery(a)){heal(t,Math.round(a.power*actor.healingFactor*powerFactor),event.effects);if(a.kind==='cleanse'){for(const id of ['burn','weaken','exposed','stun']){delete t.statuses[id];delete t.statusSources[id];}event.effects.push({cid:t.cid,type:'buff',text:'Cleansed'});}}
+   if(t.hp<=0)continue;
+   if(isRecovery(a)){heal(t,Math.round(a.power*actor.healingFactor*powerFactor),event.effects);if(a.kind==='cleanse'){for(const id of ['burn','weaken','exposed','stun']){delete t.statuses[id];delete t.statusSources[id];}delete t.elementalAura;event.effects.push({cid:t.cid,type:'buff',text:'Cleansed'});}}
    else if(isBarrier(a)){const power=Math.round(a.power*actor.healingFactor*powerFactor);t.shield=Math.max(t.shield,power);event.effects.push({cid:t.cid,type:'shield',text:'◈ '+power+' shield'});}
-   else if(a.power){const matchup=elementMultiplier(abilityElement(actor,a),t.element),index=event.effects.length;damage(t,directPower(actor,t,a.power*powerFactor,abilityElement(actor,a)),event.effects,actor);event.effects[index].multiplier=matchup;if(matchup!==1)event.effects[index].text+=matchup>1?' · strong 1.5×':' · resisted 0.75×';}
+   else if(a.power){const element=abilityElement(actor,a),matchup=elementMultiplier(element,t.element),index=event.effects.length;damage(t,directPower(actor,t,a.power*powerFactor,element),event.effects,actor);event.effects[index].multiplier=matchup;if(matchup!==1)event.effects[index].text+=matchup>1?' · strong 1.5×':' · resisted 0.75×';const reaction=touchElement(t,element);if(reaction)pending.push({reaction,target:t});else if(t.hp>0)event.effects.push({cid:t.cid,type:'aura',text:elements[element].icon+' '+element+' aura'});}
    if(a.status)applyStatus(t,a.status,a.duration,actor,event.effects);for(const effect of a.extraStatuses||[])applyStatus(t,effect.id,effect.duration,actor,event.effects);
   }
   for(const effect of a.selfStatuses||[])applyStatus(actor,effect.id,effect.duration,actor,event.effects);
   if(actor.boss&&moveId===bossProfile(actor)?.special)actor.nextSpecialRound=b.round+3;
-  b.log.push(`${actor.name} → ${a.name} → ${targets.map(t=>t.name).join(', ')}.`);logEffects(b,event);recordDefeats(b,event);outcome(b);
+  b.log.push(`${actor.name} → ${a.name} → ${targets.map(t=>t.name).join(', ')}.`);logEffects(b,event);recordDefeats(b,event);event.afterEvents=resolveReactions(b,actor,pending);outcome(b);
  }
  if(!b.outcome&&side==='player'&&!hasReady(b.players)){const skips=consumeStuns(b,'player');event.effects.push(...skips.effects);event.beforeEvents.push(...skips.beforeEvents);if(living(b.players).every(p=>p.acted))b.phase='enemy';}return event;
 }
@@ -99,6 +116,7 @@ export function finishRound(b){
   if(p.hp>0&&(p.statuses.regen||p.itemBonuses.regen))heal(p,(p.statuses.regen?Math.round(8*p.healingFactor):0)+p.itemBonuses.regen,event.effects);
   for(const id in p.statuses){if(id==='stun')continue;p.statuses[id]--;if(p.statuses[id]<=0){delete p.statuses[id];delete p.statusSources[id];if(id==='vigor'){p.maxHp=p.baseMaxHp;p.hp=Math.min(p.hp,p.maxHp);}}}
   for(const id in p.cooldowns)p.cooldowns[id]=Math.max(0,p.cooldowns[id]-1);p.acted=false;
+  if(p.elementalAura&&--p.elementalAura.remaining<=0)delete p.elementalAura;
  }
  logEffects(b,event);recordDefeats(b,event);outcome(b);if(!b.outcome){b.round++;b.phase='player';b.log.push(`Round ${b.round}: your team acts.`);if(!hasReady(b.players)){const skips=consumeStuns(b,'player');event.effects.push(...skips.effects);event.beforeEvents.push(...skips.beforeEvents);}}return event;
 }

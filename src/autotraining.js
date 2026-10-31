@@ -1,5 +1,6 @@
 import {abilities,items,isRecovery,isBarrier,isTaunt,abilityElement,elementMultiplier} from './catalog.js';
 import {available,legalTargets,damageReduction,attackMultiplier} from './combat.js';
+import {reactionFor} from './reactions.js';
 
 // Plan a normal legal turn: save endangered allies, protect the team, then favor effective damage.
 export function planAutoAction(b){
@@ -16,6 +17,7 @@ export function planAutoAction(b){
     score+=value*.35;if(isTaunt(a))score+=actor.hp/actor.maxHp>.3?48:5;else if(targets.some(p=>p.cid===taunter?.cid||p.hp/p.maxHp<.4))score+=20;
    }else if(a.power){
     for(const t of targets){const n=Math.round(a.power*actor.attackFactor*(1-damageReduction(t))*elementMultiplier(abilityElement(actor,a),t.element)*attackMultiplier(actor)*(a.itemOnly?actor.itemBonuses.abilityFactor:1)*(t.statuses.exposed?1.25:1)),hpDamage=Math.min(t.hp,Math.max(0,n-t.shield));score+=hpDamage+Math.min(n,t.shield)*.35;if(hpDamage>=t.hp)score+=80;if(a.status&&!t.statuses[a.status]&&hpDamage<t.hp)score+=a.status==='burn'?10:8;if((t.itemBonuses?.thorns||t.id==='legend-cloudsage'||t.statuses.counter)&&hpDamage>0&&actor.hp<=18)score-=allies.length===1?180:30;}
+    const counted=new Set();for(const t of targets){const reaction=reactionFor(t.elementalAura?.element,abilityElement(actor,a));if(!reaction||counted.has(reaction.id)&&(reaction.area||reaction.heal))continue;counted.add(reaction.id);if(reaction.heal){score+=Math.min(Math.max(...allies.map(p=>p.maxHp-p.hp)),Math.round(reaction.power*actor.healingFactor))*.9+8;}else{for(const target of reaction.area?foes:[t])score+=Math.min(target.hp,Math.max(0,Math.round(reaction.power*actor.attackFactor*attackMultiplier(actor)*(1-damageReduction(target)))-target.shield));if(reaction.status==='stun'&&!t.statuses.stun&&!t.acted)score+=25;else if(reaction.status&&!t.statuses[reaction.status])score+=8;}}
    }else if(a.status){const fresh=targets.filter(p=>!p.statuses[a.status]);if(!fresh.length)continue;score+=fresh.reduce((n,p)=>n+(!p.acted?9:3)+8,0);}
    if((a.extraStatuses||[]).some(s=>s.id==='counter')&&!actor.statuses.counter)score+=40;if(a.status==='stoneskin'&&!actor.statuses.stoneskin)score+=30;if(a.status==='vigor')score+=targets.filter(t=>!t.statuses.vigor).reduce((n,t)=>n+t.baseMaxHp*.2*.45+17,0);if(a.status==='stun')score+=targets.filter(t=>!t.statuses.stun&&!t.acted).length*25;
    if(a.status==='regen')score+=targets.filter(p=>!p.statuses.regen&&p.hp<p.maxHp).length*8;

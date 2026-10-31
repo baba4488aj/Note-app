@@ -22,7 +22,7 @@ Before exit or installation, the game stops auto-training, finishes the current 
 
 The release feed is **`baba4488aj/Note-app` on GitHub Releases**, configured in `desktop/release-config.json`. Public stable releases include the installer, its `.blockmap`, and `latest.yml`. Electron Updater handles version selection, download checksums, and NSIS installation. Prereleases and downgrades are disabled.
 
-The public update feed is live on [GitHub Releases](https://github.com/baba4488aj/Note-app/releases/latest). The Windows build and all 125 tests passed on GitHub Actions, and the published installer and update metadata were downloaded and checksum-verified. Code signing is not configured; the current Windows installer is unsigned.
+The public update feed is live on [GitHub Releases](https://github.com/baba4488aj/Note-app/releases/latest). The Windows build and the initial release tests passed on GitHub Actions, and the published installer and update metadata were downloaded and checksum-verified. Code signing is not configured; the current Windows installer is unsigned.
 
 ### Publish releases
 
@@ -95,17 +95,36 @@ Single-target hostile skills must target a living taunting enemy. Area attacks a
 | Stunned | Skip the next action unless cleansed first |
 | Vitality | +20% actual maximum HP, filling the added capacity once; refreshes do not stack or repeatedly heal |
 
-Statuses count down at round end, including the round applied, except stun, which lasts until the affected action is lost or it is cleansed. A ready healer can cleanse a stunned teammate before their action is lost. When only stunned pets remain ready, they skip automatically. Start-of-turn Legend passives also fire once on skipped stunned actions. Cleansing removes burn, weakness, exposure, and stun. Nothing revives fallen pets during an encounter.
+Statuses count down at round end, including the round applied, except stun, which lasts until the affected action is lost or it is cleansed. A ready healer can cleanse a stunned teammate before their action is lost. When only stunned pets remain ready, they skip automatically. Start-of-turn Legend passives also fire once on skipped stunned actions. Cleansing removes burn, weakness, exposure, stun, and elemental auras. Nothing revives fallen pets during an encounter.
 
 Vitality expiration restores normal maximum HP and clamps current HP without dealing damage. Damage combines level power, equipment, defense, type, buffs, and passives. Burn uses the original caster’s level growth, independently of gear, buffs, defense, and type multipliers. At level 100 it deals 77 HP per tick. Thorns remain determined by the item level. Counters use normal attack scaling, Grove matchups, and the attacker's armor; they cannot trigger another counter or thorns.
 
 **Element cycle:** Ember → Grove → Tide → Astral → Ember. Forward attacks deal 1.5× damage; reverse attacks deal 0.75×. Same and opposite elements are neutral. Astral is lightning. Typed skills use their listed element; untyped attacks use the caster's element. Area attacks evaluate each target separately. Healing and shields ignore elemental matchups.
 
-## Pet levels and visual growth
+## Element combinations
 
-Pets start at level 1 and cap at **100**. Existing level-20 pets retain their level and XP and can continue growing. Every defeated enemy awards XP immediately, including in encounters later lost or abandoned. The finisher receives full XP; each other deployed teammate receives half, rounded up, including fallen pets. Benched pets receive none. Burn, thorns, counters, and passive lightning credit their original source. Each defeat pays once.
+Active damaging skills, including basics, leave an elemental aura lasting two round ends, including the application round. A different element hitting that target triggers one of six reactions in either order and consumes its aura. Same-element hits refresh the aura. Healing, shields, passives, counters, burn ticks, and reactions do not apply auras. Cleanses remove auras. Enemy teams use the same rules.
 
-Next-level XP is `60 + 30 × (level − 1)`. Excess carries over. Each level above 1 adds **14% of base HP, 12% of base attack power, and 10% recovery**. Base defense grows smoothly as `0.6 × (1 − exp(−(level − 1) / 40))`, reaching about 55% at level 100; total defense including equipment and rock skin still caps at 60%. Equipment adds its own bonuses. Stats, appearance, and new skill choices apply in the **next encounter**; growth never resets a current cooldown or revives a pet.
+| Elements | Reaction | Base effect |
+| --- | --- | --- |
+| Ember + Tide | Steam burst | 14 bonus damage and 2-round weakness |
+| Ember + Grove | Wildfire | 10 bonus damage and 3-round burn |
+| Ember + Astral | Overload | 12 bonus damage and 2-round exposure |
+| Grove + Tide | Bloom | Heal the living ally with the lowest HP percentage for 16 and grant 2-round regeneration |
+| Tide + Astral | Conduction | 16 bonus lightning damage to every living enemy, bypassing taunt |
+| Grove + Astral | Static bind | 10 bonus damage and skip the target's next action |
+
+Power scales with the triggering pet's level and gear. Bonus damage respects armor, shields, and buffs, ignores type multipliers, and cannot cause retaliation. Bloom and Conduction each trigger once per skill even when an area attack consumes several matching auras. Reactions cannot recursively trigger more reactions. Auras, reaction previews, named effects, and animated bursts make combinations visible in battle. Auto-training values available reactions when choosing moves.
+
+## Account level and visual growth
+
+One **account level (1–100)** controls every companion's stats, appearance, and skill library, including benched, newly recruited, and custom pets. Pets no longer store independent levels or XP. The account XP bar appears on every screen. Collection controls sort by element, role, name, or acquisition order and filter by element and role together; these preferences are saved.
+
+Existing saves migrate to the highest valid pet level already reached. The most advanced XP fraction at that level is preserved on the new curve. For example, a level-20 pet halfway to 21 becomes account level 20 halfway to 21; every other companion immediately catches up. Teams, builds, gear, item levels, collection, and tower clears are retained.
+
+Each credited enemy defeat awards `round(38 × enemyLevel^1.25 × difficultyMultiplier × xpFactor)` account XP **once**, regardless of party size or who lands the final hit. Higher-level opponents provide more XP: level 1 gives 38 base XP, level 10 gives 676, and level 100 gives 12,017. Reduced minion XP and training/tower multipliers still apply. Burn, thorns, counters, passive lightning, and reaction kills preserve source credit. XP survives losses and abandoned encounters.
+
+Next-level XP is `round(60 × accountLevel^1.6)`. Excess carries over; the account caps at 100. Each level above 1 adds **14% of base HP, 12% of base attack power, and 10% recovery**. Base defense grows smoothly as `0.6 × (1 − exp(−(level − 1) / 40))`, reaching about 55% at level 100; total defense including equipment and rock skin caps at 60%. Equipment adds its own bonuses. Current encounters keep their original level and item snapshots; new stats, appearance, and skill choices apply in the **next encounter**, without refreshing cooldowns or reviving fallen pets.
 
 | Visual stage | Levels | Appearance |
 | --- | --- | --- |
@@ -133,7 +152,7 @@ Signature active kits remain available: Pyrragon's claw, burning team breath, an
 
 ### Training glade
 
-Repeatable encounters scale to average team level. Gentle uses two weaker enemies and 80% XP; Balanced uses three and normal XP; Challenging uses three at two levels above the team, capped at 100, and 125% XP. The featured pet is guaranteed on a claimed victory if unowned and always joins at level 1.
+Repeatable encounters scale to account level. Gentle uses two weaker enemies and 80% XP; Balanced uses three and normal XP; Challenging uses three at two levels above the account, capped at 100, and 125% XP. The featured pet is guaranteed on a claimed victory if unowned and always joins at the current account level.
 
 **Discover missing companions** guarantees a missing eligible species until the collection is complete. **Rotate the full roster** cycles all eligible pets, or choose a specific recruitment focus. All twelve ordinary pets, including missing starters, are recruitable here. Legends enter the training roster only after their trial is cleared or they are already owned; training cannot bypass locked trials. Owned pets are never duplicated or reset.
 
@@ -154,13 +173,13 @@ Trials open against a single Legend with **2.8× base HP, 20% extra damage/recov
 
 The first boss action summons up to two themed minions. Summons occupy vacant enemy slots, with at most three living enemies total, and cannot act until the next round. At half HP, the next boss turn enters **Phase II**, granting +15% attack, four extra defense points, a shield, and one reinforcement wave when space is available. There are at most two waves per trial. Minions have reduced HP, power, and XP, fresh defeat identities, and cannot create endless XP loops. Defeating the Legend disperses its summons without awarding XP for their withdrawal.
 
-Claim first victory rewards for guaranteed recruitment of that Legend in its unboosted **Young, level-1** form and double relic loot. Older saves keep their cleared floors and can replay the new trials to earn missing Legend rewards. The separate trial ledger prevents duplicate loot and recruits. Subsequent cleared-floor replays grant XP only.
+Claim first victory rewards for guaranteed recruitment of that Legend with its normal base stats at the **current account level** and double relic loot. Older saves keep their cleared floors and can replay the new trials to earn missing Legend rewards. The separate trial ledger prevents duplicate loot and recruits. Subsequent cleared-floor replays grant XP only.
 
 ## Items: individual copies, levels, and drops
 
 Each pet wears one relic copy. Copies cannot be shared at the same time. The satchel's copy selector shows the level, XP, and wearer of each individual copy. Unequipping and transferring an item preserves its growth.
 
-Equipped items earn the same battle XP award as their wearer, including shared XP, even when that pet has reached level 100. Fallen deployed pets' items also earn shared XP; benched and unworn copies earn none. Item level caps at **20**, with next-level XP `40 + 20 × (level − 1)`.
+Equipped items earn the same battle XP award as their wearer, including shared XP, even at account level 100. Fallen deployed pets' items also earn shared XP; benched and unworn copies earn none. Item level caps at **20**, with next-level XP `40 + 20 × (level − 1)`.
 
 HP, damage, recovery, defense, thorns, and regeneration bonuses grow by 10% of their base value per item level. Ability-granting relics additionally gain 2 HP and 4% skill power per level above 1. Growth saves immediately; the current battle keeps its item snapshot until the next encounter.
 
@@ -181,15 +200,15 @@ Every **completed** training encounter rolls once for a relic: **35% Gentle / 50
 
 Ordinary species: deer, fox, bear, owl, tortoise, otter, shark, lynx, stag, penguin, manta ray, and moth. Each has its own silhouette and idle motion, with role equipment and elemental details developing through growth. Recruiting a Legend unlocks its animal model in Pet studio; the innate passive and Legend-only arts stay exclusive to the actual Legend.
 
-Custom pets choose a name, role, element, color, and animal model, plus two starting special abilities. At least one special must fit the role. Wild bite and the element's starting skill complete the default four-skill loadout. Custom pets level and unlock skills normally.
+Custom pets choose a name, role, element, color, and animal model, plus two starting special abilities. At least one special must fit the role. Wild bite and the element's starting skill complete the default four-skill loadout. Custom pets immediately use the account level and its unlocked skills.
 
-Spells combine projectiles, lightning arcs, fire cones, glyphs, particles, impact pulses, and floating XP/status text. Passives and boss summons animate as separate events before the active skill. Full and Quick speeds are available. Reduced-motion preferences retain readable feedback with shortened transitions. Sound is not included.
+Spells combine projectiles, lightning arcs, fire cones, glyphs, particles, impact pulses, and floating XP/status text. Passives and boss summons animate before the active skill; elemental reactions animate afterward. Full and Quick speeds are available. Reduced-motion preferences retain readable feedback with shortened transitions. Sound is not included.
 
 ## Saves and implementation
 
 The **Saves** screen exports versioned JSON backups, imports older saves, and can undo the most recent import. Invalid or newer-version files are rejected before replacing progress. The native renderer is sandboxed, with Node disabled and a narrow preload API for updates; save writes remain in the main process’s local service. Desktop writes are serialized and use temporary files with automatic previous-save backups; a corrupt current file can recover from the valid backup.
 
-Local saves preserve pets, species, base stats, levels, XP, selected skills, team, individual relic copies and growth, equipment assignments, training focus, tower/trial progress, and animation speed. Older counted inventories become separate level-1 copies with equipment assignments retained. Invalid selections and duplicate item assignments are repaired. The storage key stays `lumenwild-v2`; no reset is required. In-progress encounters and auto-training state are not restored after reload.
+Local saves preserve pets, species, base stats, account level and XP, collection sorting/filtering, selected skills, team, individual relic copies and growth, equipment assignments, training focus, tower/trial progress, and animation speed. Older counted inventories become separate level-1 copies with equipment assignments retained. Invalid selections and duplicate item assignments are repaired. The storage key stays `lumenwild-v2`; no reset is required. In-progress encounters and auto-training state are not restored after reload.
 
 | Module | Responsibility |
 | --- | --- |
@@ -198,7 +217,9 @@ Local saves preserve pets, species, base stats, levels, XP, selected skills, tea
 | `src/stages.js` | Four visual growth stages |
 | `src/skills.js` | Unlocked libraries, four-slot validation, enemy builds |
 | `src/relics.js` | Individual copies, level scaling, XP, random drop rolls |
-| `src/progression.js` | Pet growth and shared pet/item defeat XP |
+| `src/progression.js` | Account growth, legacy level migration, pet snapshots, defeat XP |
+| `src/collection.js` | Saved sorting and combined element/role filters |
+| `src/reactions.js` | Six elemental combinations and aura rules |
 | `src/bosses.js` | Boss arts, lair rules, themed minion templates |
 | `src/modes.js` | Encounter generation, tower progression, claims |
 | `src/combat.js` | Actions, passives, cooldowns, phases, summons, kill credit |
